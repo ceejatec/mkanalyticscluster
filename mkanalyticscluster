@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+from subprocess import check_call
+
+"""
+Script to create a Couchbase Analytics cluster.
+Assumptions: software is already deployed on all IPs passed to 'nodes',
+and ncservice running on port 9090 on all IPs. Directory passed as
+"""
+
+# Parse command line, assign to variables
+argparser = argparse.ArgumentParser()
+argparser.add_argument("cc", type=str, help="IP of this node")
+argparser.add_argument("nodes", type=str,
+  help="Comma-separated list of IPs for NC nodes")
+argparser.add_argument("cbnode", type=str, help="IP of Couchbase cluster")
+argparser.add_argument("-d", "--dir", type=str, default="/root/cbas",
+  help="Root directory for node directories")
+argparser.add_argument("-n", "--ncs-per-node", type=int, default=1,
+  help="Number of NCs per node")
+argparser.add_argument("-i", "--iodevices-per-nc", type=int, default=1,
+  help="Number of iodevices per NC")
+args = argparser.parse_args()
+
+cc = args.cc
+nodes = args.nodes.split(",")
+cbnode = args.cbnode
+root = args.dir
+ncs_per_node = args.ncs_per_node
+iodevices_per_nc = args.iodevices_per_nc
+
+# Config file snippets
+iodevicepath = "{root}/{nodeidx}{ncidx}/io/{ioidx}"
+perncconfig = """
+[nc/{nodeidx}{ncidx}]
+address={nodeip}
+txnlogdir={root}/{nodeidx}{ncidx}/log/txnlog
+coredumpdir={root}/{nodeidx}{ncidx}/log/coredump
+iodevices={iodevices}
+"""
+ncconfig = """
+[nc]
+storagedir=storage
+command=cbasnc
+"""
+ccconfig = """
+[cc]
+cluster.address={ccip}
+"""
+
+# Generate Analytics cluster config file
+if not os.path.isdir(os.path.join(root, "config")):
+  os.makedirs(os.path.join(root, "config"))
+with open(os.path.join(root, "config", "cluster.conf"), "w") as conf:
+  for i in range(0, len(nodes)):
+    for j in range(0, ncs_per_node):
+      vars = {
+        'nodeidx': chr(ord('a') + i),
+        'ncidx': j,
+        'nodeip': nodes[i],
+        'root': root,
+      }
+      iodevices = ",".join([
+        iodevicepath.format(ioidx = ind, **vars) for ind in range(0, iodevices_per_nc)
+      ])
+
+      conf.write(perncconfig.format(iodevices = iodevices, **vars))
+
+  conf.write(ncconfig)
+  conf.write(ccconfig.format(ccip = cc))
+
+# Launch CC with this config file
+if not os.path.isdir(os.path.join(root, "logs")):
+  os.makedirs(os.path.join(root, "logs"))
+with open(os.path.join(root, "logs", "cc.log"), "w") as logfile:
+  check_call([
+    os.path.join(root, "bin", "cbascc"),
+   '-config-file',
+   os.path.join(root, "config", "cluster.conf")
+  ], stdout = logfile)
