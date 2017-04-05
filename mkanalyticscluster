@@ -44,18 +44,18 @@ iodevicepath = "{root}/{nodeidx}{ncidx}/io/{ioidx}"
 perncconfig = """
 [nc/{nodeidx}{ncidx}]
 address={nodeip}
-txnlogdir={root}/{nodeidx}{ncidx}/log/txnlog
-coredumpdir={root}/{nodeidx}{ncidx}/log/coredump
+txn.log.dir={root}/{nodeidx}{ncidx}/log/txnlog
+core.dump.dir={root}/{nodeidx}{ncidx}/log/coredump
 iodevices={iodevices}
 """
 ncconfig = """
 [nc]
-storagedir=storage
+storage.subdir=storage
 command=cbasnc
 """
 ccconfig = """
 [cc]
-cluster.address={ccip}
+address={ccip}
 """
 
 # Generate Analytics cluster config file
